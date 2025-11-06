@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head></head>
+
+<body>
+  <div id="lst"></div>
+  <input id="msg"><br>
+  <button id="send" disabled>SEND</button <script>
+  <script>
+    const ws = new WebSocket("ws://localhost:9000/ws");
+    ws.onmessage = evt => {
+      msg.value = "";
+      msg.focus();
+      send.disabled = false;
+      let itm = document.createElement('DIV');
+      itm.textContent = evt.data;
+      lst.appendChild(itm);
+    }
+    ws.onopen = () => {
+      send.disabled = false;
+      ws.send("test")
+    }
+    ws.onerror = err => alert(err)
+    send.onclick = () => {
+      if (!send.disabled && msg.value) {
+        ws.send(msg.value);
+        send.disabled = true;
+      }
+    }
+  </script>
+</body>
+
+</html>
