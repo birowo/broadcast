@@ -1,6 +1,6 @@
 # broadcast
 broadcast message . websocket . golang gnet lib.
 
-![](main/browsers.jpg)
+![browsers](main/browsers.jpg)
 
-![](main/termux.jpg)
+![termux](main/termux.jpg)
