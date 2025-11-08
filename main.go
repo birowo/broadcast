@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -50,74 +51,35 @@ func (w *W) Write(
 	w.l += n
 	return n, nil
 }
-func ResHdr(
-	ver, status, ct string, cl int,
-) (bs []byte) {
-	const (
-		dtK = "\r\nDate: "
-		ctK = "\r\nContent-Type: "
-		clK = "\r\nContent-Length: "
-	)
-	clStr := strconv.Itoa(cl)
-	bs = make([]byte,
-		len(ver)+1+len(status)+
-			len(dtK)+len(http.TimeFormat)+
-			len(ctK)+len(ct)+
-			len(clK)+len(clStr)+4,
-	)
-	l := copy(bs, ver)
-	bs[l] = ' '
-	l++
-	l += copy(bs[l:], status)
-	l += copy(bs[l:], dtK)
-	l += copy(bs[l:],
-		time.Now().Format(
-			http.TimeFormat,
-		),
-	)
-	l += copy(bs[l:], ctK)
-	l += copy(bs[l:], ct)
-	l += copy(bs[l:], clK)
-	l += copy(bs[l:], clStr)
-	copy(bs[l:], "\r\n\r\n")
-	return
-}
-
-var NotFound = []byte(
-	"HTTP/1.1 404 NOT FOUND\r\n\r\n",
-)
-
-func Index(
-	bs []byte, c byte, n int,
-) (i int) {
-	for n > 0 {
-		for i < len(bs) && bs[i] != ' ' {
-			i++
-		}
-		i++
-		n--
-	}
-	return
-}
 
 type Htm []byte
+
+var (
+	dtK    = []byte("\r\nDate: ")
+	ctK    = []byte("\r\nContent-Type: ")
+	clK    = []byte("\r\nContent-Length: ")
+	ver    = []byte("HTTP/1.1 ")
+	status = []byte("200 OK")
+	ctV    = []byte("text/html; charset=utf-8")
+)
 
 func (body Htm) Func(
 	rw *RW,
 ) gnet.Action {
-	println("/")
-	hdr := ResHdr(
-		"HTTP/1.1", "200 OK",
-		"text/html; charset=utf-8",
-		len(body),
-	)
-	println("resHdr:", string(hdr))
-	rw.AsyncWrite(hdr, func(
-		c gnet.Conn, err error,
-	) error {
-		c.AsyncWrite(body, nil)
-		return nil
-	})
+	clV := []byte(strconv.Itoa(len(body)))
+	dtV := []byte(time.Now().Format(
+		http.TimeFormat,
+	))
+	res := [][]byte{
+		ver, status,
+		dtK, dtV,
+		ctK, ctV,
+		clK, clV,
+		[]byte("\r\n\r\n"),
+		body,
+	}
+	fmt.Printf("response: %q\n", slices.Concat(res...))
+	rw.AsyncWritev(res, nil)
 	return gnet.None
 }
 
@@ -174,17 +136,31 @@ func Message(c gnet.Conn) gnet.Action {
 		conns.RLock()
 		for c, _ = range conns.v {
 			conns.RUnlock()
-			c.AsyncWrite(w.arr[:w.l], func(
-				c gnet.Conn, err error,
-			) error {
-				c.AsyncWrite(payload, nil)
-				return nil
-			})
+			c.AsyncWritev([][]byte{
+				w.arr[:w.l], payload,
+			}, nil)
 			conns.RLock()
 		}
 		conns.RUnlock()
 	}
 	return gnet.None
+}
+
+var NotFound = []byte(
+	"HTTP/1.1 404 NOT FOUND\r\n\r\n",
+)
+
+func Index(
+	bs []byte, c byte, n int,
+) (i int) {
+	for n > 0 {
+		for i < len(bs) && bs[i] != ' ' {
+			i++
+		}
+		i++
+		n--
+	}
+	return
 }
 func (s *Server) OnTraffic(
 	c gnet.Conn,
